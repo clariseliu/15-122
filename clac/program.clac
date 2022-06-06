@@ -1,0 +1,8 @@
+: factors  1 pick 0 fac_body ;
+: fac_body  divisible if put_k 1 + k_less_than_2 if finish 1 skip next ;
+: divisible 2 pick 4 pick % 1 < ;
+: put_k  3 pick swap rot swap ;
+: finish swap drop swap drop ;
+: next rot 1 - rot  rot fac_body ;
+: k_less_than_2 3 pick 2  < ;
+
