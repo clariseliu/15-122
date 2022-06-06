@@ -1,0 +1,77 @@
+/**************************************************************************/
+/*              COPYRIGHT Carnegie Mellon University 2022                 */
+/* Do not post this file or any derivative on a public site or repository */
+/**************************************************************************/
+#use <args>
+#use <conio>
+
+
+int main() {
+  args_t args = args_parse();
+  int argc = args->argc;         // number of command line arguments
+  string[] argv = args->argv;    // command line arguments
+
+  // parse dictionary
+  bundle_t dict = read_words(argv[0]);
+  int dict_len = string_bundle_length(dict);
+  string[] dict_a = string_bundle_array(dict);
+
+  // parse text
+  bundle_t text = read_words(argv[1]);
+  int text_len = string_bundle_length(text);
+  string[] text_a = string_bundle_array(text);
+
+
+  // alloc array for unique words
+  string[] missed = alloc_array(string, text_len);
+
+  // find the number of unique misspelled words
+  int num_misspelled=check_text_better(dict_a,dict_len,text_a,text_len, missed);
+
+  printf("There is a total of %d uniquely missed words.\n", num_misspelled);
+
+  // count the number of words with length 8
+  int length_8 = 0;
+  for (int i = 0; i < text_len; i++){
+    if(string_length(missed[i]) == 8){
+      length_8++;
+    }
+  }
+
+  printf("There are %d misspelled words with length 8.\n", length_8);
+
+  // list the first 4 misspelled words of length 15
+  println("Here are the first 4 misspelled words of length 15 in the text:");
+  int counter = 0;
+  int i = 0;
+  string[] fifteen = alloc_array(string, 4);
+  while(counter < 4 && i < text_len){
+    if (string_length(missed[i]) == 15){
+      printf("%s\n", missed[i]);
+      counter++;
+    }
+    i++;
+  }
+
+  if (counter < 4){
+    for (int j = 0; j < (4 - counter); j++){
+      println("N/A");
+    }
+  }
+
+  // find the number of times the last misspelled word appears in the text
+  if (num_misspelled == 0){
+    println("The text has no misspelled words.");
+  }
+  else {
+    text_a = string_bundle_array(text);
+    string last_word = missed[num_misspelled - 1];
+    int last_count = 0;
+    for (i = 0; i < text_len; i++){
+      if (string_equal(text_a[i], last_word)) last_count++;
+    }
+    printf("The last word is %s & appears %d times.\n", last_word, last_count);
+  }
+  return 0;
+}
+

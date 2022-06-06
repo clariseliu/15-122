@@ -1,0 +1,215 @@
+// Helper function for check_word. Stores the postcondition:
+// check_word either returns false and the word is not in the dictionary,
+// or returns true and the word is in the dictionary
+bool postcondition(bool result, string w, string[] dict, int d){
+  bool not_in = (result == false && !is_in(w, dict, 0, d));
+  bool is_in = (result == true && is_in(w, dict, 0, d));
+  return not_in || is_in;
+}
+
+// Checks whether word w is in the dictionary
+bool check_word(string[] dict, int d, string w)
+//@requires \length(dict) == d;
+//@requires is_sorted(dict, 0, d) && no_dupes(dict, 0, d);
+//@ensures postcondition(\result, w, dict, d);
+{
+  int lo = 0;
+  int hi = d;
+
+  while (lo < hi)
+  //@loop_invariant 0 <= lo && lo <= hi && hi <= d;
+  //@loop_invariant is_sorted(dict, 0, lo) && no_dupes(dict, 0, lo);
+  //@loop_invariant is_sorted(dict, hi, d) && no_dupes(dict, hi, d);
+  {
+    int mid = lo + (hi - lo) / 2;
+    //@assert lo <= mid && mid < hi;
+    if (string_equal(dict[mid], w)) return true;
+    if (string_compare(dict[mid], w) < 0) {
+      lo = mid + 1;
+    } else { //@assert string_compare(dict[mid], w) > 0;
+      hi = mid;
+      }
+  }
+  //@assert lo == hi;
+  return false;
+}
+
+// Helper function for check_text_naive. Confirms that
+// the word w is unique in the array of misspelled words.
+bool is_unique(string[] miss, int num_words, string w){
+  for (int i = 0; i < num_words; i++){
+    if(string_equal(miss[i], w)) return false;
+  }
+  return true;
+}
+
+// Naively checks for all misspelled words in a text
+int check_text_naive(string[] dict, int d, string[] text, int t, string[] miss)
+//@requires \length(dict) == d;
+//@requires \length(text) == t;
+//@requires \length(miss) >= t;
+//@requires is_sorted(dict, 0, d) && no_dupes(dict, 0, d);
+//@ensures 0 <= \result && \result <= t;
+//@ensures no_dupes(miss, 0, \result);
+{
+  int misspells = 0;
+  for (int i = 0; i < t; i ++){ // for every word in the text
+    string w = text[i];
+    // if the word is not in the dict and is unique
+    if (!check_word(dict,d,w) && is_unique(miss, misspells, w)){
+      miss[misspells] = w; // add it to the array
+      misspells++; // increase counter
+    }
+  }
+  return misspells;
+}
+
+// Checks for misspelled words in a sorted text without
+// using check_word.
+int check_sorted_text(string[] dict, int d, string[] text, int t, string[] miss)
+//@requires \length(dict) == d;
+//@requires \length(text) >= t;
+//@requires \length(miss) >= t;
+//@requires is_sorted(dict, 0, d) && no_dupes(dict, 0, d);
+//@requires is_sorted(text, 0, t) && no_dupes(text, 0, t);
+//@ensures 0 <= \result && \result <= t;
+//@ensures is_sorted(miss, 0, \result) && no_dupes(miss, 0, \result);
+{
+  if (d == 0){ // if given an empty dictionary
+    for (int j = 0; j < t; j++){
+      miss[j] = text[j];
+    }
+    return t; // add every word in the text to miss
+  }
+  // track text, dict, and misspell indices
+  int t_idx = 0;
+  int d_idx = 0;
+  int num_misspell = 0;
+
+  // for every word in the text
+  while (t_idx < t){
+    string t_w = text[t_idx];
+    string d_w = dict[d_idx];
+    int compare = string_compare(d_w, t_w);
+    if (compare< 0) d_idx++; // if d_w comes before t_w
+    if (compare > 0){ // if d_w comes after t_w
+      miss[num_misspell] = t_w;
+      num_misspell++;
+      t_idx++;
+    }
+    if (compare == 0){ // if d_w and t_w are the same word
+      d_idx++;
+      t_idx++;
+    }
+
+    if (d == d_idx){ // all words in dictionary have been exhausted
+      for (int k = t_idx; k < t; k++){
+        miss[num_misspell] = text[k];
+        num_misspell++;
+      }
+      t_idx = t;
+    }
+  }
+  return num_misspell;
+
+}
+
+// merge adapted from lecture notes
+int merge(string[] A, int lo1, int hi1, int lo2, int hi2)
+//@requires 0 <= lo1&&lo1 < hi1 && hi1 <= lo2 && lo2 < hi2 && hi2 <= \length(A);
+//@requires is_sorted(A, lo1, hi1) && no_dupes(A, lo1, hi1);
+//@requires is_sorted(A, lo2, hi2) && no_dupes(A, lo2, hi2);
+//@ensures 0 <= \result && \result <= hi2 - lo1;
+//@ensures is_sorted(A, lo1, lo1 + \result) && no_dupes(A, lo1, lo1 + \result);
+//returns # unique elements
+{
+  int b_length = (hi1 - lo1) + (hi2 - lo2);
+  string[] B = alloc_array(string, b_length);
+  int i = lo1; // lo1 to hi1
+  int j = lo2; // lo2 to hi2
+  int k = 0; // next idx of B
+
+  while (i < hi1 && j < hi2)
+  //@loop_invariant lo1 <= i && i <= hi1;
+  //@loop_invariant lo2 <= j && j <= hi2;
+  //@loop_invariant no_dupes(B, 0, k);
+  {
+    string i_word = A[i];
+    string j_word = A[j];
+    int compare = string_compare(i_word, j_word);
+    // if i_word comes before j_word or if they are the same word
+    if (compare <= 0){
+      if (k == 0 || !string_equal(B[k-1], i_word)){
+        B[k] = i_word;
+        k++;
+      }
+      i++;
+    }
+
+    // if j_word comes before i_word
+    if (compare > 0){
+      if (k == 0 || !string_equal(B[k-1], j_word)){
+        B[k] = j_word;
+        k++;
+      }
+      j++;
+    }
+  }
+  // continue appending to the first or second half
+  // as needed
+  //@assert i == hi1 || j == hi2;
+  //@assert is_sorted(B, 0, k) && no_dupes(B, 0, k);
+  while (i < hi1) {
+    if(k == 0 || !string_equal(B[k-1], A[i])) {
+      B[k] = A[i];
+      i++;
+      k++;
+    }else{
+      i++;
+    }
+  }
+
+  while (j < hi2) {
+    if(k == 0 || !string_equal(B[k-1], A[j])) {
+      B[k] = A[j];
+      j++;
+      k++;
+    }else{
+      j++;
+    }
+
+  }
+
+  // copy sorted array back into A
+  for (int l  = 0; l < k; l++)
+    A[lo1 + l] = B[l];
+
+  return k;
+}
+// mergesort adapted from lecture notes
+int mergesort(string[] A, int lo, int hi)
+//@requires 0 <= lo && lo <= hi && hi <= \length(A);
+//@ensures 0 <= \result && \result <= hi - lo;
+//@ensures is_sorted(A, lo, lo + \result) && no_dupes(A, lo, lo + \result);
+{
+  if (hi - lo == 0) return 0;
+  if (hi - lo == 1) //@assert is_sorted(A, lo, hi);
+    return 1;
+  int mid = lo + (hi - lo)/2;
+  int lo_unique = mergesort(A, lo, mid); // # unique elements in first half
+  int hi_unique = mergesort(A, mid, hi); // # unique elements in second half
+  int merge_unique = merge(A, lo, lo + lo_unique, mid, mid + hi_unique);
+  return merge_unique;
+}
+
+int check_text_better(string[] dict, int d, string[] text, int t, string[] miss)
+//@requires \length(dict) == d;
+//@requires \length(text) == t;
+//@requires \length(miss) >= t;
+//@requires is_sorted(dict, 0, d) && no_dupes(dict, 0, d);
+//@ensures 0 <= \result && \result <= t;
+//@ensures is_sorted(miss, 0, \result) && no_dupes(miss, 0, \result);
+{
+  int sorted_text_len = mergesort(text, 0, t);
+  return check_sorted_text(dict, d, text, sorted_text_len, miss);
+}
