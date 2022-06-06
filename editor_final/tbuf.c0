@@ -1,0 +1,275 @@
+#use <conio>
+/**************************************************************************/
+/*              COPYRIGHT Carnegie Mellon University 2022                 */
+/* Do not post this file or any derivative on a public site or repository */
+/**************************************************************************/
+/*
+ * Text buffers
+ *
+ * The back end for a one-character text editor, a doubly-linked list
+ * whose elements are 16-character gap buffers.
+ *
+ * 15-122 Principles of Imperative Computation */
+
+/*** Interface (DO NOT CHANGE) ***/
+
+typedef dll_pt tbuf;
+
+bool is_tbuf(tbuf* B);
+
+tbuf* tbuf_new();                  /* Creates an empty text buffer with   */
+                                   /* gap buffers of size 16              */
+void tbuf_split_pt(tbuf* B);       /* Splits a full point into two nodes  */
+                                   /* so that the new point is not full   */
+void tbuf_forward(tbuf* B);        /* Move the cursor forward/right by 1  */
+void tbuf_backward(tbuf* B);       /* Move the cursor backward/left by 1  */
+void tbuf_insert(tbuf* B, char c); /* Insert c before the cursor          */
+void tbuf_delete(tbuf* B);         /* Delete the char before the cursor   */
+                                   /* and delete point if it is empty     */
+
+/*** Implementation (include contracts here) ***/
+//Helper function for is_tbuf
+//Checks if every element is a valid gapbuf of size 16
+bool valid_elems(tbuf* B){
+  dll* curr = B -> start -> next;
+  while (curr != NULL && curr != B -> end)
+  //@loop_invariant curr != NULL;
+  {
+    if (!is_gapbuf(curr -> data)) return false;
+    if (curr -> data -> limit != 16) return false;
+    curr = curr -> next;
+  }
+  return true;
+}
+
+bool valid_left_gapbufs(tbuf* B)
+//@requires B != NULL && is_dll_pt(B);
+//@ensures B != NULL && is_dll_pt(B);
+{
+  dll* curr = B -> start -> next;
+  while (curr != NULL && curr != B -> point){
+    if (!gapbuf_at_right(curr -> data)) return false;
+    curr = curr -> next;
+  }
+  return true;
+}
+
+bool valid_right_gapbufs(tbuf* B)
+//@requires B != NULL && is_dll_pt(B);
+//@ensures B != NULL && is_dll_pt(B);
+{
+  dll* curr = B -> end -> prev;
+  while (curr != NULL && curr != B -> point){
+    if (!gapbuf_at_left(curr -> data)) return false;
+    curr = curr -> prev;
+  }
+  return true;
+}
+bool valid_buffers(tbuf* B)
+//@requires B != NULL && is_dll_pt(B);
+//@ensures B != NULL && is_dll_pt(B);
+{
+  //if it's a single element list
+  if (B -> point -> prev==B -> start&& B -> point -> next==B -> end){
+    return true;
+  }
+  // for multi-buffer tbufs
+  dll* curr = B -> start -> next;
+  while (curr != NULL && curr != B -> end) {
+    if (gapbuf_empty(curr -> data))  return false;
+    curr = curr -> next;
+  }
+  return true;
+}
+
+bool is_tbuf(tbuf* B){
+  if (!is_dll_pt(B)) return false;
+  // check every element inside the linked list
+  if (!valid_elems(B)) return false;
+  // all gapbufs left of point should have gaps on the right
+  if (!valid_left_gapbufs(B)) return false;
+  // all gapbufs right of point should have gaps on left
+  if (!valid_right_gapbufs(B)) return false;
+  // text buffer must either be empty
+  // OR
+  // all gap buffers must not be empty.
+  if (!valid_buffers(B)) return false;
+  return true;
+}
+
+// Creates an empty text buffer with gap buffers of size 16
+
+tbuf* tbuf_new()
+//@ensures is_tbuf(\result);
+//@ensures gapbuf_empty(\result -> point -> data);
+{
+  tbuf* T = alloc(tbuf);
+  T -> start = alloc(dll);
+  T -> end = alloc(dll);
+  T -> point = alloc(dll);
+  T -> start -> next = T -> point;
+  T -> point -> prev = T -> start;
+  T -> point -> next = T -> end;
+  T -> end -> prev = T -> point;
+  T -> point -> data = gapbuf_new(16);
+  return T;
+}
+
+//Helper method for tbuf_split_pt. Called
+//when the original gap is on the left side.
+void split_with_left_gap(gapbuf* full, gapbuf* left, gapbuf* right)
+//@requires gapbuf_full(full);
+//@requires gapbuf_empty(left) && gapbuf_empty(right);
+{
+  // copy all data as usual to left side
+  left -> gap_start = full -> gap_start;
+  left -> gap_end = full -> gap_start + 8;
+  for (int i = 0; i < left -> gap_start; i ++){
+    left -> buffer[i] = full -> buffer[i];
+  }
+  for (int i = left -> gap_end; i < 16; i++){
+    left -> buffer[i] = full -> buffer[i - 8];
+  }
+  // make a new gbuf for right side, with gap on left
+  right -> gap_start = 0;
+  right -> gap_end = 8;
+  for (int i = 8; i < 16; i++){
+    right -> buffer[i] = full -> buffer[i];
+  }
+}
+
+//Helper method for tbuf_split_pt. Called
+//when the original gap is on the right side.
+void split_with_right_gap(gapbuf* full, gapbuf* left, gapbuf* right)
+//@requires gapbuf_full(full);
+//@requires gapbuf_empty(left) && gapbuf_empty(right);
+{
+  // make a new gbuf for left side, with gap on right
+  left -> gap_start = 8;
+  left -> gap_end = 16;
+  for (int i = 0; i < left -> gap_start; i++){
+    left -> buffer[i] = full -> buffer[i];
+  }
+  // copy all data as usual to right side
+  right -> gap_start = full -> gap_start - 8;
+  right -> gap_end = right -> gap_start + 8;
+  for (int i = 0; i < right -> gap_start; i++){
+    right -> buffer[i] = full -> buffer[i + 8];
+  }
+  for (int i = right -> gap_end; i < 16; i++){
+    right -> buffer[i] = full -> buffer[i];
+  }
+}
+
+// Splits a full point into two node
+// so that the new point is not full
+void tbuf_split_pt(tbuf* B)
+//@requires is_tbuf(B);
+//@requires gapbuf_full(B -> point -> data);
+//@ensures !gapbuf_full(B -> point -> data);
+//@ensures is_tbuf(B);
+{
+  gapbuf* full = B -> point -> data;
+  // determine if the gap is to the left or right
+  // of the midpoint
+  int buf_size = 16;
+  int buf_half_size = buf_size/2;
+  gapbuf* left = gapbuf_new(buf_size);
+  gapbuf* right = gapbuf_new(buf_size);
+  bool og_gap_in_left = true;
+
+  if (full -> gap_start < buf_half_size) {
+    split_with_left_gap(full, left, right);
+    //@assert gapbuf_at_left(right);
+  }else {
+    //@assert full -> gap_start >= buf_half_size;
+    og_gap_in_left = false;
+    split_with_right_gap(full, left, right);
+    //@assert gapbuf_at_right(left);
+  }
+   //@assert is_gapbuf(left);
+   //@assert is_gapbuf(right);
+  // connect left and right back into B
+
+  dll* left_split = alloc(dll);
+  left_split -> data = left;
+  dll* right_split = alloc(dll);
+  right_split -> data = right;
+
+  left_split -> next = right_split;
+  right_split -> prev = left_split;
+
+  right_split -> next = B -> point -> next;
+  left_split -> prev = B -> point -> prev;
+
+  B -> point -> prev -> next = left_split;
+  B -> point -> next -> prev = right_split;
+
+  if (og_gap_in_left) B -> point = left_split;
+  else B -> point = right_split;
+  //@assert is_tbuf(B);
+}
+
+// Move the cursor forward/right by 1
+void tbuf_forward(tbuf* B)
+//@requires is_tbuf(B);
+//@ensures is_tbuf(B);
+{
+  dll* pt = B -> point;
+  //if the point's buffer is not at the very right
+  if (!gapbuf_at_right(pt -> data)){
+    gapbuf_forward(pt -> data); // move forward
+  }else if (!dll_pt_at_right(B)){
+  // the pointer is not at the end of a dll
+     dll_pt_forward(B); // move to the next dll
+     gapbuf_forward(B -> point -> data);
+  }
+}
+
+// Move the cursor backward/left by 1
+void tbuf_backward(tbuf* B)
+//@requires is_tbuf(B);
+//@ensures is_tbuf(B);
+{
+  dll* pt = B -> point;
+  // if the point's buffer is not at the very left
+  if (!gapbuf_at_left(pt -> data)){
+    // just move backwards
+    gapbuf_backward(pt -> data);
+    // the pointer is not at the start of dll
+  } else if (!dll_pt_at_left(B)){
+      dll_pt_backward(B);// move backwards
+      gapbuf_backward(B -> point -> data);
+  }
+}
+
+// Insert the char before the cursor
+void tbuf_insert(tbuf* B, char c)
+//@requires is_tbuf(B);
+//@ensures is_tbuf(B);
+{
+  if (gapbuf_full(B -> point -> data)){
+    tbuf_split_pt(B);
+  }
+  //@assert !gapbuf_full(B -> point -> data);
+  gapbuf_insert(B -> point -> data, c);
+}
+// Delete the char before the cursor and delete the point if it is empty
+void tbuf_delete(tbuf* B)
+//@requires is_tbuf(B);
+//@ensures is_tbuf(B);
+{
+  gapbuf* pt_gbuf = B -> point -> data;
+  bool one_node = (B ->point->prev==B ->start&&B ->point ->next==B ->end);
+  if (one_node){
+    if (!gapbuf_at_left(pt_gbuf)) gapbuf_delete(pt_gbuf);
+  }else {// the list has multiple gap buffers
+    if (!gapbuf_at_left(pt_gbuf)) gapbuf_delete(pt_gbuf);
+    else if (B -> point -> prev != B -> start){
+      B -> point  = B -> point -> prev;
+      gapbuf_delete(B -> point -> data);
+    }
+    if (gapbuf_empty(B -> point -> data)) dll_pt_delete(B);
+  }
+}
+

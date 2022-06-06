@@ -1,0 +1,146 @@
+/**************************************************************************/
+/*              COPYRIGHT Carnegie Mellon University 2022                 */
+/* Do not post this file or any derivative on a public site or repository */
+/**************************************************************************/
+/*
+ * Doubly linked lists with point
+ *
+ * A text buffer is a doubly linked list (dll), where one of the
+ * elements in the dll is designated as containing the point.  The
+ * list is terminated on both ends with dummy nodes whose contents are
+ * never inspected.
+ *
+ * 15-122 Principles of Imperative Computation */
+
+/*** Interface (DO NOT CHANGE) ***/
+
+typedef struct dll_node dll;
+struct dll_node {
+  elem data; /* This is defined elsewhere (gapbuf.c0 or elem-char.c0) */
+  dll* next;
+  dll* prev;
+};
+
+typedef struct dll_pt_header dll_pt;
+struct dll_pt_header {
+  dll* start; /* the first node of the list (to the left)  */
+  dll* point; /* the current node of the list (where the cursor is) */
+  dll* end;   /* the last node of the list (to the right) */
+};
+
+bool is_dll_pt(dll_pt* B);
+
+bool dll_pt_at_left(dll_pt* B);  /* Returns true if the point is first  */
+                                 /*   first (non-terminal) node         */
+bool dll_pt_at_right(dll_pt* B); /* Returns true if the point is last   */
+                                 /*   last (non-terminal) node          */
+
+void dll_pt_forward(dll_pt* B);  /* Moves the point forward (right)     */
+void dll_pt_backward(dll_pt* B); /* Moves the point backward (left)     */
+void dll_pt_delete(dll_pt* B);   /* Remove the current point            */
+
+
+/*** Implementation (include contracts here) ***/
+//Helper function for is_dll_pt
+//Confirms that the next links from start to end, and
+//passes point along the way
+bool is_dll_segment(dll* a, dll* b, dll* point)
+//@requires a != NULL && b != NULL;
+{
+  dll* curr = a;
+  bool passed_pointer = false;
+  while (curr != NULL && curr != b)
+  {
+    if (curr == point) passed_pointer = true;
+    curr = curr -> next;
+  }
+  if ((curr != b) || (!passed_pointer)) return false;
+  return true;
+}
+
+//Helper function for is_dll_pt
+//Confirms that the first node's next is the second
+//& the second node's previous is the first
+bool next_mirrors_prev(dll* start, dll* end)
+//@requires start != NULL && end != NULL;
+{
+  dll* curr = start;
+  while (curr != NULL && curr != end){
+    dll* scnd = curr -> next;
+    if (scnd -> prev != curr || curr -> next != scnd) return false;
+    curr = curr -> next;
+  }
+  return true;
+}
+
+//Verifies that the given pointer is a valid
+//doubly-linked list
+bool is_dll_pt(dll_pt* B)
+{
+  if (B == NULL) return false;
+  if (B -> start == NULL) return false;
+  if (B -> end == NULL) return false;
+  if (B -> point == NULL) return false;
+  if (B-> point == B-> start || B -> point == B-> end) return false;
+  if (!is_dll_segment(B -> start, B -> end, B -> point)) return false;
+  if (!next_mirrors_prev(B -> start, B -> end)) return false;
+  return true;
+}
+
+// Returns true if the point is first (non-terminal) node
+bool dll_pt_at_left(dll_pt* B)
+//@requires is_dll_pt(B);
+//@ensures is_dll_pt(B);
+{
+  return B -> point == B -> start -> next;
+}
+
+// Returns true if the point is last (non-terminal) node
+bool dll_pt_at_right(dll_pt* B)
+//@requires is_dll_pt(B);
+//@ensures is_dll_pt(B);
+{
+  return B -> point == B -> end -> prev;
+}
+// Moves the point forward (right)
+void dll_pt_forward(dll_pt* B)
+//@requires is_dll_pt(B);
+//@requires !dll_pt_at_right(B);
+//@ensures is_dll_pt(B);
+{
+  B -> point = B -> point -> next;
+}
+// Move the point backward (left)
+void dll_pt_backward(dll_pt* B)
+//@requires is_dll_pt(B);
+//@requires !dll_pt_at_left(B);
+//@ensures is_dll_pt(B);
+{
+  B -> point = B -> point -> prev;
+}
+// Remove the current point
+void dll_pt_delete(dll_pt* B)
+//@requires is_dll_pt(B);
+//@requires !(B -> point -> prev==B -> start&& B -> point -> next==B -> end);
+//@ensures is_dll_pt(B);
+{
+  dll* pt = B -> point;
+  // point is the very first node
+  if (pt -> prev == B -> start){
+    B -> start -> next = pt -> next;
+    pt -> next -> prev = B -> start;
+    B -> point = pt -> next;
+  }
+  // point is the very last node
+  else if (pt -> next == B -> end){
+    B -> end -> prev = pt -> prev;
+    pt -> prev -> next = B -> end;
+    B -> point = pt -> prev;
+  }
+  // point is somewhere in the middle
+  else {
+    pt -> prev -> next = pt -> next;
+    pt -> next -> prev = pt -> prev;
+    B -> point = pt -> next;
+  }
+}
