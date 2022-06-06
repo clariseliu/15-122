@@ -1,0 +1,99 @@
+// Helper function for blur(); iterates through the mask to confirm that
+// all values inside are nonnegative.
+bool all_non_negative(int maskwidth, int[] mask)
+//@requires is_valid_imagesize(maskwidth, maskwidth);
+//@requires \length(mask) == maskwidth * maskwidth;
+{
+  int length = maskwidth * maskwidth;
+  for (int i = 0; i < length; i ++){
+    if (mask[i] < 0) return false;
+  }
+  return true;
+}
+
+// Helper function for blur(). Blurs a given pixel using the
+// procedure described in programming write-up.
+pixel_t blur_p(int[] p, int r, int c, int w, int h, int[] m, int mw)
+//@requires is_valid_pixel(r, c, w, h);
+//@requires is_valid_imagesize(w, h);
+//@requires is_valid_imagesize(mw, mw);
+//@ensures is_valid_pixel(r, c, w, h);
+{
+  int idx = get_index(r, c, w, h); // get the current index
+  int red = 0; // instantiate variables for RGB
+  int green = 0;
+  int blue = 0;
+
+  // determine the start & end positions of the mask
+  int r_start = r - mw / 2;
+  int r_end = r + mw / 2 + 1;
+  int c_start = c - mw / 2;
+  int c_end = c + mw / 2 + 1;
+
+  int weight_sum = 0; // track the sum of overall weights
+  int weight_idx = 0; // track the # of mask pixels actually used
+
+  // for every row
+  for (int j = r_start; j < r_end; j++)
+  //@loop_invariant r_start <= j && j <= r_end;
+  {
+    // for every col
+    for (int i = c_start; i < c_end; i++)
+    //@loop_invariant c_start <= i && i <= c_end;
+    {
+      if (is_valid_pixel(j, i, w, h)){ // if pixel exists
+        pixel_t current = p[get_index(j, i, w, h)]; // get current pixel
+        int intensity = m[weight_idx]; // find associated index
+
+        // update RGB using the intensity factor
+        red += get_red(current) * intensity;
+        green += get_green(current) * intensity;
+        blue += get_blue(current) * intensity;
+
+        weight_sum += intensity; // update the sum of weights
+      }
+      weight_idx++; // traverse to the next weighted cell
+    }
+  }
+
+  // by now for the given pixel has summations for the applied intensity values
+  // and the modified RGB values. compute the output intensity
+  red = red / weight_sum;
+  green = green / weight_sum;
+  blue = blue / weight_sum;
+
+  // return a new cell with the modified ARGB values
+  return make_pixel(get_alpha(p[idx]), red, green, blue);
+}
+
+pixel_t[] blur(pixel_t[] pixels,int width,int height,int[] mask,int maskwidth)
+//@requires is_valid_imagesize(width, height);
+//@requires \length(pixels) == (width * height);
+//@requires all_non_negative(maskwidth, mask);
+//@requires mask[(maskwidth * maskwidth) / 2] != 0;
+//@requires maskwidth % 2 == 1 && is_valid_imagesize(maskwidth, maskwidth);
+//@requires \length(mask) == maskwidth * maskwidth;
+//@ensures \result != pixels;
+//@ensures \length(\result) == \length(pixels);
+{
+  pixel[] blurred = alloc_array(pixel, width * height); // array for blury img
+  //@assert \length(blurred) == \length(pixels);
+
+  // for every row
+  for (int j = 0; j < height; j++)
+  //@loop_invariant 0 <= j && j <= height;
+  {
+    // for every col
+    for (int i = 0; i < width; i++)
+    //@loop_invariant 0 <= i && i <= width;
+    {
+      //@assert is_valid_pixel(j, i, width, height);
+      int idx = get_index(j, i, width, height); // get index of current pxl
+      //@assert 0 <= idx && idx < \length(pixels);
+
+      // use helper function to blur the pixel
+      blurred[idx] = blur_p(pixels, j, i, width, height, mask, maskwidth);
+    }
+  }
+  return blurred;  // return the blurred pixel
+}

@@ -1,0 +1,67 @@
+#use <conio>
+#use <util>
+
+// Helper function for reflect() that calculates the new index for a pixel
+// given its reflected row/column & the image's new width/height.
+int readd_pixel(int row_r, int col_r, int width_new, int height_new)
+//@requires is_valid_imagesize(width_new, height_new);
+//@requires 0 <= row_r && row_r < height_new;
+//@requires 0 <= col_r && col_r < width_new;
+//@ensures 0 <= \result && \result < (4 * width_new * height_new);
+{
+  return get_index(row_r, col_r, width_new, height_new);
+}
+
+// Given a 1-D array of images, reflect it over the x and y axis to produce
+// a new image with reflections split into top-left, top-right, bottom-left
+// and bottom-right corners
+pixel_t[] reflect(pixel_t[] pixels, int width, int height)
+//@requires is_valid_imagesize(width, height);
+//@requires \length(pixels) == width*height;
+//@requires is_valid_imagesize(2 * width, 2 * height);
+//@ensures \length(\result) == 4 * \length(pixels);
+//@ensures \result != pixels;
+{
+  // alloc new array
+  pixel_t[] reflections = alloc_array(pixel_t, 4*width*height);
+  int width_new = 2 * width;
+  int height_new = 2 * height;
+
+  // for every row
+  for (int row_t = 0; row_t < height; row_t++)
+  //@loop_invariant 0 <= row_t && row_t <= height;
+  {
+    // for every column
+    for (int i = 0; i < width; i++)
+    //@loop_invariant 0 <= i && i <= width;
+    {
+      //@assert 0 <= row_t && row_t < height && 0 <= i && i < width;
+      int index = get_index(row_t, i, width, height);
+      //@assert 0 <= index && index < \length(pixels);
+
+      // reflect column and row such that
+      // the result is constructed in terms
+      // of its top and bottom half
+      int col_l = width_new/2 - i - 1;
+      int row_b = height_new - row_t - 1;
+      int col_r = i + (width_new/2);
+
+      // add the pixel to top left, top right, bottom left, and bottom right
+      int tl = readd_pixel(row_t, col_l, width_new, height_new);
+      int tr = readd_pixel(row_t, col_r, width_new, height_new);
+      int bl = readd_pixel(row_b, col_l, width_new, height_new);
+      int br = readd_pixel(row_b, col_r, width_new, height_new);
+
+      //@assert (\length(pixels) * 4) == \length(reflections);
+      //@assert 0 <= index && index < \length(pixels);
+      // add the pixel into its 4 respective places
+      reflections[tl] = pixels[index];
+      reflections[tr] = pixels[index];
+      reflections[bl] = pixels[index];
+      reflections[br] = pixels[index];
+    }
+  }
+
+  return reflections;
+
+}
