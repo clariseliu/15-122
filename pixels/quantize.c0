@@ -1,0 +1,162 @@
+/**************************************************************************/
+/*              COPYRIGHT Carnegie Mellon University 2022                 */
+/* Do not post this file or any derivative on a public site or repository */
+/**************************************************************************/
+/* The pixel interface describes the pixel type. It also defines
+   five functions: get_red(p), get_green(p), get_blue(p),
+   get_alpha(p), and make_pixel(a,r,g,b).  If you're *given* a
+   working pixel library, you can use the pixel interface
+   without knowing how pixels are represented.
+
+   When writing this file, only use the pixel interface.  We'll
+   check your code by compiling and running it against different
+   implementations of the pixel interface.
+
+   There are  tasks in this file:
+    - Task 1 - Implement quantize() as described in the writeup
+    - Task 2 - Testing quantize()
+*/
+
+/* Task 1 - Implement quantize() as described in the writeup */
+
+pixel_t quantize(pixel_t p, int q)
+//@requires 0 <= q && q <= 8;
+//@ensures 0 <= get_alpha(\result) && get_alpha(\result) <= 255;
+//@ensures 0 <= get_red(\result) && get_red(\result)<= 255;
+//@ensures 0 <= get_green(\result) && get_green(\result)<= 255;
+//@ensures 0 <= get_blue(\result) && get_blue(\result) <= 255;
+{
+
+  // quant level of 0 does not affect the pixel
+ if (q == 0) return p;
+
+
+  // get original values
+  int a = get_alpha(p);
+
+  int r = get_red(p);
+  int g = get_green(p);
+  int b = get_blue(p);
+
+  // shift everything
+  int s_r = (r >> q) << q;
+  int s_g = (g >> q) << q;
+  int s_b = (b >> q) << q;
+
+  // return the shifted pixel
+  return make_pixel(a, s_r, s_g, s_b);
+}
+
+/* Task 2 - Testing quantize()
+
+   Write some more tests for quantize. Remember to respect the pixels
+   interface! We *will* run these tests, and will grade them based on
+   their ability to catch buggy implementations of quantize.
+*/
+
+void test_quantize() {
+  pixel_t p = quantize(make_pixel(0xFF, 0xFF, 0xFF, 0xFF), 4);
+  assert(get_alpha(p) == 0xFF);
+  assert(get_red(p)   == 0xF0);
+  assert(get_green(p) == 0xF0);
+  assert(get_blue(p)  == 0xF0);
+
+
+  // given testcase in write-up
+  pixel_t given = quantize(make_pixel(0x00, 0x6B, 0xBE, 0xD7), 5);
+  assert(get_alpha(given) == 0x00);
+  assert(get_red(given) == 0x60);
+  assert(get_green(given) == 0xA0);
+  assert(get_blue(given) == 0xC0);
+
+  // q = 0 should not change the pixel
+  assert(get_alpha(quantize(p, 0)) == 0xFF);
+  assert(get_red(quantize(p, 0)) == 0xF0);
+  assert(get_green(quantize(p,0)) == 0xF0);
+  assert(get_blue(quantize(p, 0)) == 0xF0);
+
+
+  pixel_t noF = quantize(make_pixel(0x66, 0x44, 0x22, 0x11), 0);
+  assert(get_alpha(noF) == 0x66);
+  assert(get_red(noF) == 0x44);
+  assert(get_green(noF) == 0x22);
+  assert(get_blue(noF) == 0x11);
+
+  // q = 8 should remove all clear all the bits
+  pixel_t f = quantize(make_pixel(0xFF, 0xFF, 0xFF, 0xFF), 8);
+  pixel_t f_cleared = make_pixel(0xFF, 0x00, 0x00, 0x00);
+  assert(get_alpha(f) == get_alpha(f_cleared));
+  assert(get_red(f) == get_red(f_cleared));
+  assert(get_green(f) == get_green(f_cleared));
+  assert(get_blue(f) == get_blue(f_cleared));
+  pixel_t f1 = quantize(make_pixel(0x01, 0x49, 0xDE, 0xAB), 8);
+  pixel_t f1_cleared = make_pixel(0x01, 0x00, 0x00, 0x00);
+  assert(get_alpha(f1) == get_alpha(f1_cleared));
+  assert(get_red(f1) == get_red(f1_cleared));
+  assert(get_green(f1) == get_green(f1_cleared));
+  assert(get_blue(f1) == get_blue(f1_cleared));
+
+  // if the pixel is already cleared, bit shifts shouldn't affect it
+  pixel_t empt = make_pixel(0x00, 0x00, 0x00, 0x00);
+  pixel_t empt_q = quantize(empt, 7);
+  pixel_t only_a = make_pixel(0x63, 0x00, 0x00, 0x00);
+  pixel_t only_a0 = quantize(only_a, 0);
+  pixel_t only_a2 = quantize(only_a, 2);
+  pixel_t only_a5 = quantize(only_a, 5);
+  assert(get_alpha(empt) == get_alpha(empt_q));
+  assert(get_red(empt) == get_red(empt_q));
+  assert(get_green(empt) == get_green(empt_q));
+  assert(get_blue(empt) == get_blue(empt_q));
+
+  pixel_t empt2 = quantize(empt, 2);
+  assert(get_alpha(empt) == get_alpha(empt2));
+  assert(get_red(empt) == get_red(empt2));
+  assert(get_green(empt) == get_green(empt2));
+  assert(get_blue(empt) == get_blue(empt2));
+  // check that alpha is unaffected
+  assert(get_alpha(only_a0) == get_alpha(only_a));
+  assert(get_alpha(only_a2) == get_alpha(only_a));
+  assert(get_alpha(only_a5) == get_alpha(only_a));
+
+  // checking highest quantization that does not clear all pixels, 7
+  p = quantize(make_pixel(0x01, 0xFF, 0x99, 0x32), 7);
+  assert(get_alpha(p) == 0x01);
+  assert(get_red(p) == 0x80);
+  assert(get_green(p) == 0x80);
+  assert(get_blue(p) == 0x00);
+
+  p = quantize(make_pixel(0xFF, 0xFF, 0xFF, 0xFF), 7);
+
+  assert(get_alpha(p) == 0xFF);
+  assert(get_red(p) == 0x80);
+  assert(get_green(p) == 0x80);
+  assert(get_blue(p) == 0x80);
+
+  // each color only has "1" in a random place
+  pixel_t one = make_pixel(0x00, 0x10, 0x20, 0x40);
+  pixel_t one_s = quantize(one, 5);
+  assert(get_alpha(one_s) == 0x00);
+  assert(get_red(one_s) == 0x00);
+  assert(get_green(one_s) == get_green(one));
+  assert(get_blue(one_s) == get_blue(one));
+
+  // checking with 1 shift
+  pixel_t p6 = quantize(make_pixel(0x66, 0x06, 0x60, 0x57),1);
+  assert(get_alpha(p6) == 0x66);
+  assert(get_red(p6) == 0x06);
+  assert(get_green(p6) == 0x60);
+  assert(get_blue(p6) == 0x56);
+
+  pixel_t p7 = quantize(make_pixel(0xFF, 0xFF, 0xFF, 0xFF), 1);
+  pixel_t p8 = quantize(make_pixel(0x01, 0x00, 0x01, 0x00), 1);
+
+  assert(get_alpha(p7) == 0xFF);
+  assert(get_red(p7) == 0xFE);
+  assert(get_green(p7) == 0xFE);
+  assert(get_blue(p7) == 0xFE);
+
+  assert(get_alpha(p8) == 0x01);
+  assert(get_red(p8) == 0x00);
+  assert(get_green(p8) == 0x00);
+  assert(get_blue(p8) == 0x00);
+}
